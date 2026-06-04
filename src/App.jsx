@@ -122,7 +122,7 @@ const defaultData = {
     cashTarget: 15000,
     rothLimit: 7500,
     rothContributedStart: 0,
-    rothMonthlyTarget: 500,
+    rothMonthlyTarget: 625,
     brokerageTarget: 1000,
     coffeeTarget: 60,
     categoryTargets: defaultCategoryTargets,
