@@ -33,6 +33,7 @@ const defaultCategoryDefinitions = [
 ];
 
 const defaultCategories = Object.fromEntries(defaultCategoryDefinitions.map((category) => [category.key, 0]));
+const defaultCategoryItems = Object.fromEntries(defaultCategoryDefinitions.map((category) => [category.key, []]));
 
 const defaultCategoryTargets = {
   gym: 15,
@@ -131,6 +132,7 @@ const defaultData = {
       month,
       {
         categories: defaultCategories,
+        categoryItems: defaultCategoryItems,
         roth: 0,
         brokerage: 0,
         cashBuffer: 0,
@@ -167,12 +169,47 @@ function categoryValueDefaults(categoryDefinitions) {
   return Object.fromEntries(categoryDefinitions.map((category) => [category.key, 0]));
 }
 
+function categoryItemDefaults(categoryDefinitions) {
+  return Object.fromEntries(categoryDefinitions.map((category) => [category.key, []]));
+}
+
+function makeTransactionId() {
+  return `item_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeCategoryItems(rawItems, categoryDefinitions) {
+  const source = rawItems && typeof rawItems === "object" ? rawItems : {};
+
+  return Object.fromEntries(
+    categoryDefinitions.map((category) => {
+      const items = Array.isArray(source[category.key]) ? source[category.key] : [];
+
+      return [
+        category.key,
+        items
+          .map((item) => ({
+            id: String(item?.id || makeTransactionId()),
+            name: String(item?.name || ""),
+            amount: toNumber(item?.amount),
+          }))
+          .filter((item) => item.id),
+      ];
+    })
+  );
+}
+
+function sumCategoryItems(items = []) {
+  return items.reduce((sum, item) => sum + toNumber(item.amount), 0);
+}
+
 function getEffectiveMonthActuals(monthActuals, targets, categoryDefinitions = defaultCategoryDefinitions) {
   const manualOverrides = monthActuals.manualOverrides || defaultManualOverrides;
+  const categoryItems = normalizeCategoryItems(monthActuals.categoryItems, categoryDefinitions);
 
   return {
     ...monthActuals,
     categories: { ...categoryValueDefaults(categoryDefinitions), ...monthActuals.categories },
+    categoryItems,
     roth: toNumber(monthActuals.roth),
     brokerage: toNumber(monthActuals.brokerage),
     cashBuffer: toNumber(monthActuals.cashBuffer),
@@ -225,9 +262,11 @@ function normalizeData(raw) {
       ...normalizedCategoryDefaults,
       ...(incomingMonth.categories || {}),
     };
+    const incomingCategoryItems = normalizeCategoryItems(incomingMonth.categoryItems, normalizedCategories);
 
     normalized.actuals[month] = {
       categories: incomingCategories,
+      categoryItems: incomingCategoryItems,
       roth: toNumber(incomingMonth.roth),
       brokerage: toNumber(incomingMonth.brokerage),
       cashBuffer: toNumber(incomingMonth.cashBuffer),
@@ -299,6 +338,45 @@ function NumericInput({ label, value, onChange, prefix = "$", hint }) {
       </div>
       {hint ? <small>{hint}</small> : null}
     </label>
+  );
+}
+
+function TransactionAmountInput({ value, onChange, label }) {
+  const [draft, setDraft] = useState(String(value));
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) setDraft(String(value));
+  }, [value, isEditing]);
+
+  return (
+    <div className="inputShell transactionAmount">
+      <b>$</b>
+      <input
+        type="number"
+        step="0.01"
+        value={draft}
+        aria-label={label}
+        onFocus={(event) => {
+          setIsEditing(true);
+          if (toNumber(value) === 0) event.target.select();
+        }}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          if (next !== "" && next !== "-" && next !== ".") onChange(toNumber(next));
+        }}
+        onBlur={() => {
+          setIsEditing(false);
+          if (draft === "" || draft === "-" || draft === ".") {
+            onChange(0);
+            setDraft("0");
+          } else {
+            setDraft(String(toNumber(draft)));
+          }
+        }}
+      />
+    </div>
   );
 }
 
@@ -455,6 +533,10 @@ function App() {
                 ...current.actuals[month].categories,
                 [key]: 0,
               },
+              categoryItems: {
+                ...(current.actuals[month].categoryItems || categoryItemDefaults(current.categories)),
+                [key]: [],
+              },
               manualOverrides: {
                 ...(current.actuals[month].manualOverrides || defaultManualOverrides),
                 categories: {
@@ -489,10 +571,15 @@ function App() {
             ...current.actuals[current.selectedMonth].categories,
             [key]: value,
           },
+          categoryItems: {
+            ...categoryItemDefaults(current.categories),
+            ...(current.actuals[current.selectedMonth].categoryItems || {}),
+            [key]: [],
+          },
           manualOverrides: {
             ...(current.actuals[current.selectedMonth].manualOverrides || defaultManualOverrides),
             categories: {
-              ...defaultManualOverrides.categories,
+              ...createManualOverrides(current.categories).categories,
               ...(current.actuals[current.selectedMonth].manualOverrides?.categories || {}),
               [key]: recurringCategoryKeys(current.categories).includes(key)
                 ? true
@@ -502,6 +589,73 @@ function App() {
         },
       },
     }));
+  }
+
+  function setActualCategoryItems(current, key, items) {
+    const currentMonth = current.actuals[current.selectedMonth];
+    const categoryItems = {
+      ...categoryItemDefaults(current.categories),
+      ...(currentMonth.categoryItems || {}),
+      [key]: items,
+    };
+
+    return {
+      ...current,
+      actuals: {
+        ...current.actuals,
+        [current.selectedMonth]: {
+          ...currentMonth,
+          categories: {
+            ...currentMonth.categories,
+            [key]: sumCategoryItems(items),
+          },
+          categoryItems,
+          manualOverrides: {
+            ...(currentMonth.manualOverrides || defaultManualOverrides),
+            categories: {
+              ...createManualOverrides(current.categories).categories,
+              ...(currentMonth.manualOverrides?.categories || {}),
+              [key]: recurringCategoryKeys(current.categories).includes(key)
+                ? true
+                : currentMonth.manualOverrides?.categories?.[key] || false,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  function addCategoryItem(key) {
+    setData((current) => {
+      const currentItems = current.actuals[current.selectedMonth].categoryItems?.[key] || [];
+      const nextItems = [...currentItems, { id: makeTransactionId(), name: "", amount: 0 }];
+      return setActualCategoryItems(current, key, nextItems);
+    });
+  }
+
+  function updateCategoryItem(key, itemId, updates) {
+    setData((current) => {
+      const currentItems = current.actuals[current.selectedMonth].categoryItems?.[key] || [];
+      const nextItems = currentItems.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              ...updates,
+              name: updates.name !== undefined ? updates.name : item.name,
+              amount: updates.amount !== undefined ? toNumber(updates.amount) : item.amount,
+            }
+          : item
+      );
+      return setActualCategoryItems(current, key, nextItems);
+    });
+  }
+
+  function removeCategoryItem(key, itemId) {
+    setData((current) => {
+      const currentItems = current.actuals[current.selectedMonth].categoryItems?.[key] || [];
+      const nextItems = currentItems.filter((item) => item.id !== itemId);
+      return setActualCategoryItems(current, key, nextItems);
+    });
   }
 
   function updateActualField(key, value) {
@@ -750,6 +904,9 @@ function App() {
               selectedMonth={selectedMonth}
               updateMonth={updateMonth}
               updateActualCategory={updateActualCategory}
+              addCategoryItem={addCategoryItem}
+              updateCategoryItem={updateCategoryItem}
+              removeCategoryItem={removeCategoryItem}
               updateActualField={updateActualField}
               useTargetsAsPlaceholders={useTargetsAsPlaceholders}
               fillRepeatingTargets={fillRepeatingTargets}
@@ -942,11 +1099,120 @@ function MonthlyInputs({
   selectedMonth,
   updateMonth,
   updateActualCategory,
+  addCategoryItem,
+  updateCategoryItem,
+  removeCategoryItem,
   updateActualField,
   useTargetsAsPlaceholders,
   fillRepeatingTargets,
   isCity,
 }) {
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const [isNarrowMonthlyLayout, setIsNarrowMonthlyLayout] = useState(() => window.innerWidth <= 900);
+
+  useEffect(() => {
+    const updateLayout = () => setIsNarrowMonthlyLayout(window.innerWidth <= 900);
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
+  const monthlyCategoryColumns = useMemo(
+    () => {
+      if (isNarrowMonthlyLayout) return [categories];
+
+      return categories.reduce(
+        (columns, category, index) => {
+          columns[index % 2].push(category);
+          return columns;
+        },
+        [[], []]
+      );
+    },
+    [categories, isNarrowMonthlyLayout]
+  );
+
+  function toggleCategoryItems(key) {
+    setExpandedCategories((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function openCategoryItems(key) {
+    setExpandedCategories((current) => ({ ...current, [key]: true }));
+  }
+
+  function renderMonthlyCategory(category) {
+    const items = selectedActuals.categoryItems?.[category.key] || [];
+    const itemTotal = sumCategoryItems(items);
+    const isExpanded = Boolean(expandedCategories[category.key]);
+
+    return (
+      <div className="monthlyCategoryCard" key={category.key}>
+        <NumericInput
+          label={`${categoryIcon(category, isCity)} ${category.label}`}
+          value={selectedActuals.categories[category.key]}
+          onChange={(value) => updateActualCategory(category.key, value)}
+          hint={
+            items.length
+              ? `${money(itemTotal)} from ${items.length} item${items.length === 1 ? "" : "s"}.`
+              : category.recurring
+                ? "Can be filled from Targets, then edited."
+                : undefined
+          }
+        />
+        <div className="itemToolbar">
+          <button
+            className={`softButton compactButton itemToggleButton ${isExpanded ? "expanded" : ""}`}
+            onClick={() => toggleCategoryItems(category.key)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Hide" : "Show"} ${category.label} items`}
+          >
+            <span className="itemToggleIcon" aria-hidden="true">&gt;</span>
+            <span>Items ({items.length})</span>
+          </button>
+          <button
+            className="softButton compactButton addItemButton"
+            onClick={() => {
+              openCategoryItems(category.key);
+              addCategoryItem(category.key);
+            }}
+          >
+            Add item
+          </button>
+        </div>
+        <div className={`transactionListWrap ${isExpanded ? "expanded" : ""}`}>
+          <div className="transactionList">
+            {items.length ? (
+              items.map((item) => (
+                <div className="transactionRow" key={item.id}>
+                  <input
+                    className="textInput transactionName"
+                    value={item.name}
+                    placeholder="Item"
+                    aria-label={`${category.label} item name`}
+                    onChange={(event) => updateCategoryItem(category.key, item.id, { name: event.target.value })}
+                  />
+                  <TransactionAmountInput
+                    value={item.amount}
+                    label={`${category.label} item amount`}
+                    onChange={(amount) => updateCategoryItem(category.key, item.id, { amount })}
+                  />
+                  <button
+                    className="dangerButton compactButton removeItemButton"
+                    onClick={() => removeCategoryItem(category.key, item.id)}
+                    aria-label={`Remove ${category.label} item`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))
+            ) : (
+              <small>No itemized transactions yet.</small>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className="pageStack">
       <div className="sectionHeader">
@@ -966,15 +1232,11 @@ function MonthlyInputs({
       </div>
 
       <Card title="Spending Totals" icon={isCity ? "{}" : "🌷"}>
-        <div className="categoryTargetGrid">
-          {categories.map((category) => (
-            <NumericInput
-              key={category.key}
-              label={`${categoryIcon(category, isCity)} ${category.label}`}
-              value={selectedActuals.categories[category.key]}
-              onChange={(value) => updateActualCategory(category.key, value)}
-              hint={category.recurring ? "Can be filled from Targets, then edited." : undefined}
-            />
+        <div className="monthlyCategoryGrid">
+          {monthlyCategoryColumns.map((column, index) => (
+            <div className="monthlyCategoryColumn" key={`monthly-category-column-${index}`}>
+              {column.map((category) => renderMonthlyCategory(category))}
+            </div>
           ))}
         </div>
       </Card>
@@ -1660,6 +1922,114 @@ h2 {
   gap: 14px;
 }
 .categoryTargetGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.monthlyCategoryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.monthlyCategoryColumn {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+.monthlyCategoryCard {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 2px dashed rgba(77, 56, 93, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.34);
+}
+.transactionList {
+  display: grid;
+  gap: 9px;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 10px;
+}
+.transactionListWrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+.transactionListWrap.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+.itemToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+  gap: 8px;
+}
+.itemToggleButton,
+.addItemButton {
+  min-height: 38px;
+  width: 100%;
+}
+.itemToggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.itemToggleButton span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.itemToggleIcon {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-weight: 900;
+  transition: transform 180ms ease;
+}
+.itemToggleButton.expanded .itemToggleIcon {
+  transform: rotate(90deg);
+}
+.itemToggleButton {
+  background: linear-gradient(180deg, #fff9df 0 52%, var(--blush) 52% 100%);
+  box-shadow: 0 5px 0 #d8869d, 4px 4px 0 rgba(77, 56, 93, 0.13);
+}
+.itemToggleButton:hover {
+  box-shadow: 0 4px 0 #d8869d, 3px 3px 0 rgba(77, 56, 93, 0.13);
+}
+.transactionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(108px, 0.72fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.transactionRow .textInput,
+.transactionRow .inputShell {
+  min-height: 44px;
+}
+.transactionName {
+  width: 100%;
+}
+.transactionAmount input {
+  padding-top: 9px;
+  padding-bottom: 10px;
+}
+.removeItemButton {
+  min-height: 44px;
+}
+.addItemButton {
+  min-width: 0;
+}
 .field {
   display: grid;
   gap: 7px;
@@ -2133,6 +2503,10 @@ body[data-theme="dark-city"]::before {
   border-color: rgba(255, 200, 87, 0.22);
   background: rgba(255, 255, 255, 0.04);
 }
+.darkCity .monthlyCategoryCard {
+  border-color: rgba(255, 200, 87, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+}
 .darkCity .textInput,
 .darkCity .selectInput {
   color: #25172f;
@@ -2393,6 +2767,10 @@ body[data-theme="dark-city"]::before {
   border-color: rgba(124, 255, 178, 0.18);
   background: rgba(124, 255, 178, 0.035);
 }
+.darkCity .monthlyCategoryCard {
+  border-color: rgba(124, 255, 178, 0.18);
+  background: rgba(124, 255, 178, 0.035);
+}
 .darkCity .pieLegendRow {
   border-bottom-color: rgba(124, 255, 178, 0.16);
 }
@@ -2583,6 +2961,14 @@ body[data-theme="dark-city"]::before {
   color: #050505;
   background: linear-gradient(180deg, #f4f4f4 0 52%, #7cffb2 52% 100%);
 }
+.darkCity .itemToggleButton {
+  color: #050505;
+  background: linear-gradient(180deg, #f4f4f4 0 52%, #a7ffd0 52% 100%);
+  box-shadow: 0 5px 0 #4aa16e, 4px 4px 0 rgba(0,0,0,0.34);
+}
+.darkCity .itemToggleButton:hover {
+  box-shadow: 0 4px 0 #4aa16e, 3px 3px 0 rgba(0,0,0,0.34);
+}
 
 .darkCity .plainToggle {
   color: #f4f4f4;
@@ -2663,7 +3049,8 @@ body[data-theme="dark-city"]::before {
 }
 
 .darkCity .pieLegendRow,
-.darkCity .categoryEditorRow {
+.darkCity .categoryEditorRow,
+.darkCity .monthlyCategoryCard {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
@@ -2758,12 +3145,18 @@ body[data-theme="plain"]::before {
   border: 1px solid #d7dde3;
   border-radius: 8px;
   box-shadow: none;
+  font-weight: 600;
 }
 
 .plainTheme h1,
 .plainTheme h2 {
   color: #111827;
   text-shadow: none;
+  font-weight: 700;
+}
+
+.plainTheme .statCard strong {
+  font-size: clamp(1rem, 1.8vw, 1.28rem);
 }
 
 .plainTheme .tagline,
@@ -2772,7 +3165,8 @@ body[data-theme="plain"]::before {
 .plainTheme .progressSummary,
 .plainTheme .row.strong,
 .plainTheme .cashGrid div,
-.plainTheme .categoryEditorRow {
+.plainTheme .categoryEditorRow,
+.plainTheme .monthlyCategoryCard {
   color: #1f2933;
   background: #f8fafc;
   border: 1px solid #d7dde3;
@@ -2793,6 +3187,7 @@ body[data-theme="plain"]::before {
   border: 1px solid #cfd7df;
   border-radius: 8px;
   box-shadow: none;
+  font-weight: 600;
 }
 
 .plainTheme .nav button:hover,
@@ -2810,6 +3205,14 @@ body[data-theme="plain"]::before {
   color: #ffffff;
   background: #334155;
   border-color: #334155;
+}
+.plainTheme .itemToggleButton {
+  color: #334155;
+  background: #eef2f7;
+  border-color: #b9c4cf;
+}
+.plainTheme .itemToggleButton:hover {
+  background: #e2e8f0;
 }
 
 .plainTheme .plainToggle:hover {
@@ -2838,6 +3241,7 @@ body[data-theme="plain"]::before {
 .plainTheme .selectInput,
 .plainTheme select {
   color: #1f2933;
+  font-weight: 500;
 }
 
 .plainTheme .inputShell:focus-within,
@@ -2866,6 +3270,37 @@ body[data-theme="plain"]::before {
 .plainTheme .noteList,
 .plainTheme td {
   color: #1f2933;
+}
+
+.plainTheme .tagline,
+.plainTheme .badges span,
+.plainTheme .gameTop span,
+.plainTheme .statCard span,
+.plainTheme .statCard strong,
+.plainTheme .miniStats strong,
+.plainTheme .field span,
+.plainTheme .pieLegendRow span,
+.plainTheme .pieLegendRow b,
+.plainTheme .pieLegendRow em,
+.plainTheme .progressItem span,
+.plainTheme .cashGrid span,
+.plainTheme .cashGrid strong,
+.plainTheme .row span,
+.plainTheme .row strong,
+.plainTheme .checkField,
+.plainTheme .investColumn,
+.plainTheme tfoot td {
+  font-weight: 600;
+}
+
+.plainTheme .heroCopy p:not(.tagline),
+.plainTheme .noteList,
+.plainTheme td {
+  font-weight: 400;
+}
+
+.plainTheme th {
+  font-weight: 600;
 }
 
 .plainTheme .progressItem {
@@ -2920,6 +3355,7 @@ body[data-theme="plain"]::before {
   .statGrid { grid-template-columns: repeat(2, 1fr); }
   .grid.two { grid-template-columns: 1fr; }
   .categoryTargetGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monthlyCategoryGrid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -2932,6 +3368,9 @@ body[data-theme="plain"]::before {
   .themeButtons { flex-direction: column; align-items: stretch; }
   .gameTop, .sectionHeader, .actions, .progressSummary { align-items: stretch; flex-direction: column; }
   .miniStats, .statGrid, .formGrid, .categoryTargetGrid, .cashGrid { grid-template-columns: 1fr; }
+  .transactionRow { grid-template-columns: 1fr; }
+  .addItemButton,
+  .removeItemButton { width: 100%; }
   .categoryEditorRow { grid-template-columns: 54px minmax(0, 1fr); }
   .categoryEditorRow .selectInput,
   .categoryEditorRow .checkField,
