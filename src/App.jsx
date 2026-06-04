@@ -57,6 +57,21 @@ const defaultCategoryTargets = {
   misc: 0,
 };
 
+const defaultNotesText = [
+  "This is a planning tool, not financial advice.",
+  "Data saves locally in this browser using localStorage.",
+  "You can type directly into the site. You do not need to import or export for normal use.",
+  "Use export/import JSON only to back up data or move it to another browser/device.",
+  "Monthly actuals stay real until typed in or filled with a button.",
+  "Use Fill repeating targets to copy Gym, Apple Storage, Roth IRA, and brokerage targets into the selected month.",
+  "Changing a target updates future fills, but it does not rewrite old monthly actuals.",
+  "The 2026 IRA limit defaults to $7,500 and can be edited.",
+  "Unknown categories should be tracked first, then given realistic targets later.",
+  "If she moves out or needs a car, revisit the cash reserve and monthly buffer.",
+  "The softer Roth pace is intentional because she is not fully comfortable moving $7,500 all at once.",
+  "The app is meant to help visibility and behavior, not create fake precision.",
+].join("\n");
+
 const recurringFieldTargets = {
   roth: "rothMonthlyTarget",
   brokerage: "brokerageTarget",
@@ -129,6 +144,7 @@ function normalizeCategoryDefinitions(rawCategories) {
 
 const defaultData = {
   ownerName: "Gabby",
+  notesText: defaultNotesText,
   selectedMonth: "January",
   categories: defaultCategoryDefinitions,
   targets: {
@@ -256,6 +272,7 @@ function normalizeData(raw) {
   const normalized = {
     ...defaultData,
     ownerName: String(source.ownerName || defaultData.ownerName).trim() || defaultData.ownerName,
+    notesText: typeof source.notesText === "string" ? source.notesText : defaultData.notesText,
     selectedMonth: months.includes(source.selectedMonth) ? source.selectedMonth : defaultData.selectedMonth,
     categories: normalizedCategories,
     targets: {
@@ -492,6 +509,10 @@ function App() {
 
   function updateOwnerName(value) {
     setData((current) => ({ ...current, ownerName: value }));
+  }
+
+  function updateNotesText(value) {
+    setData((current) => ({ ...current, notesText: value }));
   }
 
   function updateTarget(key, value) {
@@ -982,6 +1003,7 @@ function App() {
             <Notes
               data={data}
               updateOwnerName={updateOwnerName}
+              updateNotesText={updateNotesText}
               resetData={resetData}
               exportJson={exportJson}
               importRef={importRef}
@@ -1469,7 +1491,7 @@ function Investing({ data, effectiveActuals, totals, isCity }) {
   );
 }
 
-function Notes({ data, updateOwnerName, resetData, exportJson, importRef, importJson, isCity, isMountain, isCoffee }) {
+function Notes({ data, updateOwnerName, updateNotesText, resetData, exportJson, importRef, importJson, isCity, isMountain, isCoffee }) {
   return (
     <section className="pageStack">
       <div className="sectionHeader">
@@ -1495,21 +1517,13 @@ function Notes({ data, updateOwnerName, resetData, exportJson, importRef, import
         </div>
       </Card>
 
-      <Card title={isCity ? "Terminal Notes" : "Garden Notes"} icon={isCity ? "$_" : "🌿"}>
-        <ul className="noteList">
-          <li>This is a planning tool, not financial advice.</li>
-          <li>Data saves locally in this browser using localStorage.</li>
-          <li>You can type directly into the site. You do not need to import or export for normal use.</li>
-          <li>Use export/import JSON only to back up data or move it to another browser/device.</li>
-          <li>Monthly actuals stay real until typed in or filled with a button.</li>
-          <li>Use Fill repeating targets to copy Gym, Apple Storage, Roth IRA, and brokerage targets into the selected month.</li>
-          <li>Changing a target updates future fills, but it does not rewrite old monthly actuals.</li>
-          <li>The 2026 IRA limit defaults to $7,500 and can be edited.</li>
-          <li>Unknown categories should be tracked first, then given realistic targets later.</li>
-          <li>If she moves out or needs a car, revisit the cash reserve and monthly buffer.</li>
-          <li>The softer Roth pace is intentional because she is not fully comfortable moving $7,500 all at once.</li>
-          <li>The app is meant to help visibility and behavior, not create fake precision.</li>
-        </ul>
+      <Card title={isCoffee ? "Cafe Notes" : isCity ? "Terminal Notes" : "Garden Notes"} icon={isCoffee ? "☕" : isCity ? "$_" : "🌿"}>
+        <textarea
+          className="textInput noteTextArea"
+          value={data.notesText}
+          onChange={(event) => updateNotesText(event.target.value)}
+          aria-label="Editable app notes"
+        />
       </Card>
 
       <Card title="Backup Tools" icon={isCity ? "💾" : "🪴"}>
@@ -2461,6 +2475,13 @@ input {
   color: #574462;
   line-height: 1.65;
 }
+.noteTextArea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  line-height: 1.6;
+  padding: 14px;
+}
 .investChart {
   display: grid;
   grid-template-columns: repeat(12, minmax(54px, 1fr));
@@ -2728,6 +2749,12 @@ body[data-theme="coffee"]::before {
   border-color: #4b2c1d;
   box-shadow: inset 0 -4px 0 #e7c79e, 4px 4px 0 rgba(75, 44, 29, 0.12);
 }
+.coffeeTheme .noteTextArea {
+  color: #fff6e8;
+  background: rgba(42, 23, 16, 0.42);
+  border-color: rgba(255, 246, 232, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 232, 0.24), 4px 4px 0 rgba(20, 10, 6, 0.2);
+}
 .coffeeTheme .inputShell:focus-within,
 .coffeeTheme .textInput:focus,
 .coffeeTheme .selectInput:focus,
@@ -2735,12 +2762,17 @@ body[data-theme="coffee"]::before {
   background: #fffdf4;
   outline: 3px solid rgba(191, 123, 59, 0.36);
 }
+.coffeeTheme .noteTextArea:focus {
+  color: #fff6e8;
+  background: rgba(42, 23, 16, 0.5);
+}
 .coffeeTheme .field span,
 .coffeeTheme .readonlyCategoryTotal span,
 .coffeeTheme .pieLegendRow span,
 .coffeeTheme .progressItem span,
 .coffeeTheme .checkField,
-.coffeeTheme .noteList {
+.coffeeTheme .noteList,
+.coffeeTheme .noteTextArea {
   color: #fff6e8;
 }
 .coffeeTheme small,
