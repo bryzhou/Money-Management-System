@@ -954,6 +954,7 @@ function App() {
               addCategory={addCategory}
               archiveCategory={archiveCategory}
               isCity={isCity}
+              isCoffee={isCoffee}
             />
           )}
           {activePage === "Monthly Inputs" && (
@@ -1059,6 +1060,7 @@ function Targets({
   addCategory,
   archiveCategory,
   isCity,
+  isCoffee,
 }) {
   const targetFields = [
     ["income", "Monthly take-home income"],
@@ -1076,7 +1078,7 @@ function Targets({
       <div className="sectionHeader">
         <div>
           <span className="eyebrow">Targets</span>
-          <h2>{isCity ? "Set the monthly config file" : "Set the garden's monthly watering plan"}</h2>
+          <h2>{isCoffee ? "Dial in the cafe's monthly roast plan" : isCity ? "Set the monthly config file" : "Set the garden's monthly watering plan"}</h2>
         </div>
       </div>
       <Card title="Core Money Targets" icon={isCity ? ">" : "🌼"}>
@@ -2530,8 +2532,11 @@ tfoot td { font-weight: 900; background: #c9f2c4; }
 
 body[data-theme="coffee"] {
   color: #f7e5cf;
-  background-color: #24150f;
-  background-image: none;
+  background-color: #3a2016;
+  background-image: linear-gradient(180deg, #2d1810 0%, #40251a 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 body[data-theme="coffee"]::before {
@@ -2615,17 +2620,27 @@ body[data-theme="coffee"]::before {
 }
 .coffeeTheme .gameCard,
 .coffeeTheme .card,
-.coffeeTheme .statCard,
+.coffeeTheme .statCard {
+  color: #fff6e8;
+  background: rgba(91, 50, 31, 0.36);
+  border-color: rgba(255, 246, 232, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 232, 0.44),
+    inset 0 -1px 0 rgba(255, 246, 232, 0.12),
+    0 12px 34px rgba(20, 10, 6, 0.34),
+    8px 8px 0 rgba(20, 10, 6, 0.26);
+  backdrop-filter: blur(20px) saturate(1.12);
+}
 .coffeeTheme .miniStats div {
   color: #3b2418;
   background: #f4d2a7;
   border-color: #4b2c1d;
-  box-shadow: var(--shadow);
+  box-shadow: var(--small-shadow);
 }
 .coffeeTheme .gameCard {
   color: #fff6e8;
-  background: #2a1710;
-  border-color: #8a5638;
+  background: rgba(42, 23, 16, 0.42);
+  border-color: rgba(255, 246, 232, 0.28);
 }
 .coffeeTheme .gameCard .gameTop span,
 .coffeeTheme .gameCard .miniStats small,
@@ -2646,9 +2661,27 @@ body[data-theme="coffee"]::before {
   border-color: #8a5638;
   box-shadow: inset 0 -4px 0 #1a0f0b, 4px 4px 0 rgba(20, 10, 6, 0.24);
 }
-.coffeeTheme .statCard:nth-child(2) { background: #ead0b4; }
-.coffeeTheme .statCard:nth-child(3) { background: #f1c28f; }
-.coffeeTheme .statCard:nth-child(4) { background: #c9854e; }
+.coffeeTheme .statCard:nth-child(2) { background: rgba(111, 63, 39, 0.36); }
+.coffeeTheme .statCard:nth-child(3) { background: rgba(130, 78, 48, 0.34); }
+.coffeeTheme .statCard:nth-child(4) { background: rgba(145, 85, 52, 0.42); }
+@supports not (backdrop-filter: blur(1px)) {
+  .coffeeTheme .gameCard,
+  .coffeeTheme .card,
+  .coffeeTheme .statCard {
+    background: #f4d2a7;
+  }
+  .coffeeTheme .gameCard {
+    background: #2a1710;
+  }
+  .coffeeTheme .statCard span,
+  .coffeeTheme .statCard strong,
+  .coffeeTheme .statCard.good strong {
+    color: #3b2418;
+  }
+  .coffeeTheme .statCard.warning strong {
+    color: #7f2f2b;
+  }
+}
 .coffeeTheme .pixelGarden {
   background: #f2bf83;
 }
@@ -2708,7 +2741,7 @@ body[data-theme="coffee"]::before {
 .coffeeTheme .progressItem span,
 .coffeeTheme .checkField,
 .coffeeTheme .noteList {
-  color: #342015;
+  color: #fff6e8;
 }
 .coffeeTheme small,
 .coffeeTheme .miniStats small,
@@ -2717,11 +2750,33 @@ body[data-theme="coffee"]::before {
 .coffeeTheme .investColumn,
 .coffeeTheme .navMonth span,
 .coffeeTheme .themeSelectField span {
-  color: #7b5a42;
+  color: #f1d2b3;
+}
+.coffeeTheme .monthlyCategoryCard .field span,
+.coffeeTheme .monthlyCategoryCard .readonlyCategoryTotal span,
+.coffeeTheme .monthlyCategoryCard small,
+.coffeeTheme .categoryEditorRow .checkField,
+.coffeeTheme .progressItem span,
+.coffeeTheme .progressItem small,
+.coffeeTheme .cashGrid span,
+.coffeeTheme .row span,
+.coffeeTheme .noteList {
+  color: #342015;
+}
+.coffeeTheme .pieLegendRow b,
+.coffeeTheme .pieLegendRow em {
+  color: #fff6e8;
+}
+.coffeeTheme .progressSummary strong,
+.coffeeTheme .progressSummary span,
+.coffeeTheme .navMonth span {
+  color: #342015;
 }
 .coffeeTheme .gameTop span,
 .coffeeTheme .statCard span,
-.coffeeTheme .statCard strong,
+.coffeeTheme .statCard strong {
+  color: #fff6e8;
+}
 .coffeeTheme .miniStats strong,
 .coffeeTheme .row strong,
 .coffeeTheme td,
@@ -2729,10 +2784,10 @@ body[data-theme="coffee"]::before {
   color: #3b2418;
 }
 .coffeeTheme .statCard.good strong {
-  color: #4b2c1d;
+  color: #fff6e8;
 }
 .coffeeTheme .statCard.warning strong {
-  color: #7f2f2b;
+  color: #ffd4ce;
 }
 .coffeeTheme .progressTrack,
 .coffeeTheme .columnTrack {
