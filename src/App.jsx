@@ -68,6 +68,12 @@ function recurringCategoryKeys(categoryDefinitions = defaultCategoryDefinitions)
   return categoryDefinitions.filter((category) => category.recurring && !category.archived).map((category) => category.key);
 }
 
+function directInputCategoryKeys(categoryDefinitions = defaultCategoryDefinitions) {
+  return categoryDefinitions
+    .filter((category) => (category.recurring || category.kind === "Fixed") && !category.archived)
+    .map((category) => category.key);
+}
+
 function activeCategories(categoryDefinitions = defaultCategoryDefinitions) {
   return categoryDefinitions.filter((category) => !category.archived);
 }
@@ -561,34 +567,38 @@ function App() {
   }
 
   function updateActualCategory(key, value) {
-    setData((current) => ({
-      ...current,
-      actuals: {
-        ...current.actuals,
-        [current.selectedMonth]: {
-          ...current.actuals[current.selectedMonth],
-          categories: {
-            ...current.actuals[current.selectedMonth].categories,
-            [key]: value,
-          },
-          categoryItems: {
-            ...categoryItemDefaults(current.categories),
-            ...(current.actuals[current.selectedMonth].categoryItems || {}),
-            [key]: [],
-          },
-          manualOverrides: {
-            ...(current.actuals[current.selectedMonth].manualOverrides || defaultManualOverrides),
+    setData((current) => {
+      if (!directInputCategoryKeys(current.categories).includes(key)) return current;
+
+      return {
+        ...current,
+        actuals: {
+          ...current.actuals,
+          [current.selectedMonth]: {
+            ...current.actuals[current.selectedMonth],
             categories: {
-              ...createManualOverrides(current.categories).categories,
-              ...(current.actuals[current.selectedMonth].manualOverrides?.categories || {}),
-              [key]: recurringCategoryKeys(current.categories).includes(key)
-                ? true
-                : current.actuals[current.selectedMonth].manualOverrides?.categories?.[key] || false,
+              ...current.actuals[current.selectedMonth].categories,
+              [key]: value,
+            },
+            categoryItems: {
+              ...categoryItemDefaults(current.categories),
+              ...(current.actuals[current.selectedMonth].categoryItems || {}),
+              [key]: [],
+            },
+            manualOverrides: {
+              ...(current.actuals[current.selectedMonth].manualOverrides || defaultManualOverrides),
+              categories: {
+                ...createManualOverrides(current.categories).categories,
+                ...(current.actuals[current.selectedMonth].manualOverrides?.categories || {}),
+                [key]: recurringCategoryKeys(current.categories).includes(key)
+                  ? true
+                  : current.actuals[current.selectedMonth].manualOverrides?.categories?.[key] || false,
+              },
             },
           },
         },
-      },
-    }));
+      };
+    });
   }
 
   function setActualCategoryItems(current, key, items) {
@@ -682,28 +692,36 @@ function App() {
   }
 
   function useTargetsAsPlaceholders() {
-    setData((current) => ({
-      ...current,
-      actuals: {
-        ...current.actuals,
-        [current.selectedMonth]: {
-          ...current.actuals[current.selectedMonth],
-          categories: { ...current.targets.categoryTargets },
-          roth: current.targets.rothMonthlyTarget,
-          brokerage: current.targets.brokerageTarget,
-          cashBuffer: current.actuals[current.selectedMonth].cashBuffer,
-          manualOverrides: {
+    setData((current) => {
+      const currentMonth = current.actuals[current.selectedMonth];
+      const directKeys = directInputCategoryKeys(current.categories);
+
+      return {
+        ...current,
+        actuals: {
+          ...current.actuals,
+          [current.selectedMonth]: {
+            ...currentMonth,
             categories: {
-              ...defaultManualOverrides.categories,
-              ...(current.actuals[current.selectedMonth].manualOverrides?.categories || {}),
-              ...Object.fromEntries(recurringCategoryKeys(current.categories).map((key) => [key, true])),
+              ...currentMonth.categories,
+              ...Object.fromEntries(directKeys.map((key) => [key, current.targets.categoryTargets[key]])),
             },
-            roth: true,
-            brokerage: true,
+            roth: current.targets.rothMonthlyTarget,
+            brokerage: current.targets.brokerageTarget,
+            cashBuffer: currentMonth.cashBuffer,
+            manualOverrides: {
+              categories: {
+                ...createManualOverrides(current.categories).categories,
+                ...(currentMonth.manualOverrides?.categories || {}),
+                ...Object.fromEntries(recurringCategoryKeys(current.categories).map((key) => [key, true])),
+              },
+              roth: true,
+              brokerage: true,
+            },
           },
         },
-      },
-    }));
+      };
+    });
   }
 
   function fillRepeatingTargets() {
@@ -1108,6 +1126,7 @@ function MonthlyInputs({
   isCity,
 }) {
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [pendingRemovalItems, setPendingRemovalItems] = useState({});
   const [isNarrowMonthlyLayout, setIsNarrowMonthlyLayout] = useState(() => window.innerWidth <= 900);
 
   useEffect(() => {
@@ -1139,77 +1158,125 @@ function MonthlyInputs({
     setExpandedCategories((current) => ({ ...current, [key]: true }));
   }
 
+  function pendingRemovalKey(categoryKey, itemId) {
+    return `${categoryKey}:${itemId}`;
+  }
+
+  function requestItemRemoval(categoryKey, itemId) {
+    setPendingRemovalItems((current) => ({ ...current, [pendingRemovalKey(categoryKey, itemId)]: true }));
+  }
+
+  function cancelItemRemoval(categoryKey, itemId) {
+    setPendingRemovalItems((current) => {
+      const next = { ...current };
+      delete next[pendingRemovalKey(categoryKey, itemId)];
+      return next;
+    });
+  }
+
+  function confirmItemRemoval(categoryKey, itemId) {
+    cancelItemRemoval(categoryKey, itemId);
+    removeCategoryItem(categoryKey, itemId);
+  }
+
   function renderMonthlyCategory(category) {
     const items = selectedActuals.categoryItems?.[category.key] || [];
-    const itemTotal = sumCategoryItems(items);
     const isExpanded = Boolean(expandedCategories[category.key]);
+    const usesDirectTotal = category.recurring || category.kind === "Fixed";
 
     return (
       <div className="monthlyCategoryCard" key={category.key}>
-        <NumericInput
-          label={`${categoryIcon(category, isCity)} ${category.label}`}
-          value={selectedActuals.categories[category.key]}
-          onChange={(value) => updateActualCategory(category.key, value)}
-          hint={
-            items.length
-              ? `${money(itemTotal)} from ${items.length} item${items.length === 1 ? "" : "s"}.`
-              : category.recurring
-                ? "Can be filled from Targets, then edited."
-                : undefined
-          }
-        />
-        <div className="itemToolbar">
-          <button
-            className={`softButton compactButton itemToggleButton ${isExpanded ? "expanded" : ""}`}
-            onClick={() => toggleCategoryItems(category.key)}
-            aria-expanded={isExpanded}
-            aria-label={`${isExpanded ? "Hide" : "Show"} ${category.label} items`}
-          >
-            <span className="itemToggleIcon" aria-hidden="true">&gt;</span>
-            <span>Items ({items.length})</span>
-          </button>
-          <button
-            className="softButton compactButton addItemButton"
-            onClick={() => {
-              openCategoryItems(category.key);
-              addCategoryItem(category.key);
-            }}
-          >
-            Add item
-          </button>
-        </div>
-        <div className={`transactionListWrap ${isExpanded ? "expanded" : ""}`}>
-          <div className="transactionList">
-            {items.length ? (
-              items.map((item) => (
-                <div className="transactionRow" key={item.id}>
-                  <input
-                    className="textInput transactionName"
-                    value={item.name}
-                    placeholder="Item"
-                    aria-label={`${category.label} item name`}
-                    onChange={(event) => updateCategoryItem(category.key, item.id, { name: event.target.value })}
-                  />
-                  <TransactionAmountInput
-                    value={item.amount}
-                    label={`${category.label} item amount`}
-                    onChange={(amount) => updateCategoryItem(category.key, item.id, { amount })}
-                  />
-                  <button
-                    className="dangerButton compactButton removeItemButton"
-                    onClick={() => removeCategoryItem(category.key, item.id)}
-                    aria-label={`Remove ${category.label} item`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))
-            ) : (
-              <small>No itemized transactions yet.</small>
-            )}
+        {usesDirectTotal ? (
+          <NumericInput
+            label={`${categoryIcon(category, isCity)} ${category.label}`}
+            value={selectedActuals.categories[category.key]}
+            onChange={(value) => updateActualCategory(category.key, value)}
+            hint="Fixed or repeating category. Enter the monthly total directly."
+          />
+        ) : (
+          <>
+            <div className="readonlyCategoryTotal">
+              <span>{categoryIcon(category, isCity)} {category.label}</span>
+              <strong>{money(selectedActuals.categories[category.key])}</strong>
+              <small>{items.length ? `${items.length} item${items.length === 1 ? "" : "s"} entered.` : "Add items to update this total."}</small>
+            </div>
+            <div className="itemToolbar">
+              <button
+                className={`softButton compactButton itemToggleButton ${isExpanded ? "expanded" : ""}`}
+                onClick={() => toggleCategoryItems(category.key)}
+                aria-expanded={isExpanded}
+                aria-label={`${isExpanded ? "Hide" : "Show"} ${category.label} items`}
+              >
+                <span className="itemToggleIcon" aria-hidden="true">&gt;</span>
+                <span>Items ({items.length})</span>
+              </button>
+              <button
+                className="softButton compactButton addItemButton"
+                onClick={() => {
+                  openCategoryItems(category.key);
+                  addCategoryItem(category.key);
+                }}
+              >
+                Add item
+              </button>
+            </div>
+            <div className={`transactionListWrap ${isExpanded ? "expanded" : ""}`}>
+              <div className="transactionList">
+                {items.length ? (
+                  items.map((item) => {
+                    const isPendingRemoval = Boolean(pendingRemovalItems[pendingRemovalKey(category.key, item.id)]);
+
+                    return (
+                      <div className="transactionRow" key={item.id}>
+                        <input
+                          className="textInput transactionName"
+                          value={item.name}
+                          placeholder="Item"
+                          aria-label={`${category.label} item name`}
+                          onChange={(event) => updateCategoryItem(category.key, item.id, { name: event.target.value })}
+                        />
+                        <TransactionAmountInput
+                          value={item.amount}
+                          label={`${category.label} item amount`}
+                          onChange={(amount) => updateCategoryItem(category.key, item.id, { amount })}
+                        />
+                        {isPendingRemoval ? (
+                          <div className="removeConfirmGroup" aria-label={`Confirm removing ${category.label} item`}>
+                            <button
+                              className="dangerButton compactButton confirmRemoveButton"
+                              onClick={() => confirmItemRemoval(category.key, item.id)}
+                              aria-label={`Confirm remove ${category.label} item`}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              className="softButton compactButton cancelRemoveButton"
+                              onClick={() => cancelItemRemoval(category.key, item.id)}
+                              aria-label={`Cancel remove ${category.label} item`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="dangerButton compactButton removeItemButton"
+                            onClick={() => requestItemRemoval(category.key, item.id)}
+                            aria-label={`Remove ${category.label} item`}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <small>No itemized transactions yet.</small>
+                )}
+              </div>
+            </div>
+          </>
+        )}
           </div>
-        </div>
-      </div>
     );
   }
 
@@ -1944,6 +2011,30 @@ h2 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.34);
 }
+.readonlyCategoryTotal {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.readonlyCategoryTotal span {
+  color: #574462;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+.readonlyCategoryTotal strong {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 3px solid var(--outline);
+  border-radius: 7px;
+  color: var(--ink);
+  background: rgba(255, 249, 223, 0.72);
+  box-shadow: inset 0 -4px 0 rgba(77, 56, 93, 0.1), 4px 4px 0 rgba(77, 56, 93, 0.1);
+  font-size: 1.04rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
 .transactionList {
   display: grid;
   gap: 9px;
@@ -2026,6 +2117,27 @@ h2 {
 }
 .removeItemButton {
   min-height: 44px;
+}
+.removeConfirmGroup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(38px, 1fr));
+  gap: 6px;
+}
+.confirmRemoveButton,
+.cancelRemoveButton {
+  min-height: 44px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.confirmRemoveButton {
+  color: #153b24;
+  background: linear-gradient(180deg, #fff9df 0 52%, #8ee0a5 52% 100%);
+  box-shadow: 0 5px 0 #4f9f65, 4px 4px 0 rgba(77, 56, 93, 0.13);
+}
+.cancelRemoveButton {
+  color: #5f1f27;
+  background: linear-gradient(180deg, #fff9df 0 52%, #ff9aa4 52% 100%);
+  box-shadow: 0 5px 0 #d56b72, 4px 4px 0 rgba(77, 56, 93, 0.13);
 }
 .addItemButton {
   min-width: 0;
@@ -2961,6 +3073,16 @@ body[data-theme="dark-city"]::before {
   color: #050505;
   background: linear-gradient(180deg, #f4f4f4 0 52%, #7cffb2 52% 100%);
 }
+.darkCity .confirmRemoveButton {
+  color: #050505;
+  background: linear-gradient(180deg, #f4f4f4 0 52%, #7cffb2 52% 100%);
+  box-shadow: 0 5px 0 #2e7b50, 4px 4px 0 rgba(0,0,0,0.34);
+}
+.darkCity .cancelRemoveButton {
+  color: #ffffff;
+  background: linear-gradient(180deg, #3a151d 0 52%, #ff7a91 52% 100%);
+  box-shadow: 0 5px 0 #8d2635, 4px 4px 0 rgba(0,0,0,0.34);
+}
 .darkCity .itemToggleButton {
   color: #050505;
   background: linear-gradient(180deg, #f4f4f4 0 52%, #a7ffd0 52% 100%);
@@ -3052,6 +3174,15 @@ body[data-theme="dark-city"]::before {
 .darkCity .categoryEditorRow,
 .darkCity .monthlyCategoryCard {
   border-color: rgba(255, 255, 255, 0.16);
+}
+.darkCity .readonlyCategoryTotal span {
+  color: #f4f4f4;
+}
+.darkCity .readonlyCategoryTotal strong {
+  color: #f4f4f4;
+  background: #101311;
+  border-color: #3a3a3a;
+  box-shadow: inset 0 -4px 0 #050505, 4px 4px 0 rgba(0,0,0,0.28);
 }
 
 .darkCity .pieLegendRow {
@@ -3206,6 +3337,16 @@ body[data-theme="plain"]::before {
   background: #334155;
   border-color: #334155;
 }
+.plainTheme .confirmRemoveButton {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+.plainTheme .cancelRemoveButton {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
 .plainTheme .itemToggleButton {
   color: #334155;
   background: #eef2f7;
@@ -3279,6 +3420,8 @@ body[data-theme="plain"]::before {
 .plainTheme .statCard strong,
 .plainTheme .miniStats strong,
 .plainTheme .field span,
+.plainTheme .readonlyCategoryTotal span,
+.plainTheme .readonlyCategoryTotal strong,
 .plainTheme .pieLegendRow span,
 .plainTheme .pieLegendRow b,
 .plainTheme .pieLegendRow em,
@@ -3301,6 +3444,17 @@ body[data-theme="plain"]::before {
 
 .plainTheme th {
   font-weight: 600;
+}
+
+.plainTheme .readonlyCategoryTotal span {
+  color: #1f2933;
+}
+.plainTheme .readonlyCategoryTotal strong {
+  color: #1f2933;
+  background: #ffffff;
+  border: 1px solid #cfd7df;
+  box-shadow: none;
+  font-size: 1rem;
 }
 
 .plainTheme .progressItem {
@@ -3370,7 +3524,8 @@ body[data-theme="plain"]::before {
   .miniStats, .statGrid, .formGrid, .categoryTargetGrid, .cashGrid { grid-template-columns: 1fr; }
   .transactionRow { grid-template-columns: 1fr; }
   .addItemButton,
-  .removeItemButton { width: 100%; }
+  .removeItemButton,
+  .removeConfirmGroup { width: 100%; }
   .categoryEditorRow { grid-template-columns: 54px minmax(0, 1fr); }
   .categoryEditorRow .selectInput,
   .categoryEditorRow .checkField,
