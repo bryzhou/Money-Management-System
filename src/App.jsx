@@ -3,6 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const STORAGE_KEY = "gabbys-money-garden-v1";
 const THEME_KEY = "gabbys-money-garden-theme";
 
+const themeOptions = [
+  { value: "garden", label: "Money Garden" },
+  { value: "money-mountain", label: "Money Mountain" },
+  { value: "dark-city", label: "Money Terminal" },
+  { value: "plain", label: "Plain" },
+];
+
 const months = [
   "January",
   "February",
@@ -120,6 +127,7 @@ function normalizeCategoryDefinitions(rawCategories) {
 }
 
 const defaultData = {
+  ownerName: "Gabby",
   selectedMonth: "January",
   categories: defaultCategoryDefinitions,
   targets: {
@@ -161,6 +169,11 @@ function money(value, compact = false) {
     currency: "USD",
     maximumFractionDigits: compact ? 0 : 2,
   }).format(toNumber(value));
+}
+
+function possessiveName(name) {
+  const safeName = String(name || "").trim() || defaultData.ownerName;
+  return `${safeName}${safeName.toLowerCase().endsWith("s") ? "'" : "'s"}`;
 }
 
 function clamp(value, min, max) {
@@ -241,6 +254,7 @@ function normalizeData(raw) {
 
   const normalized = {
     ...defaultData,
+    ownerName: String(source.ownerName || defaultData.ownerName).trim() || defaultData.ownerName,
     selectedMonth: months.includes(source.selectedMonth) ? source.selectedMonth : defaultData.selectedMonth,
     categories: normalizedCategories,
     targets: {
@@ -435,6 +449,7 @@ function App() {
   const selectedActuals = effectiveActuals[selectedMonth];
   const isCity = theme === "dark-city";
   const isPlain = theme === "plain";
+  const isMountain = theme === "money-mountain";
 
   const totals = useMemo(() => {
     const totalSpending = Object.values(selectedActuals.categories).reduce((sum, item) => sum + toNumber(item), 0);
@@ -471,6 +486,10 @@ function App() {
 
   function updateMonth(month) {
     setData((current) => ({ ...current, selectedMonth: month }));
+  }
+
+  function updateOwnerName(value) {
+    setData((current) => ({ ...current, ownerName: value }));
   }
 
   function updateTarget(key, value) {
@@ -758,7 +777,7 @@ function App() {
   }
 
   function resetData() {
-    if (window.confirm(`Reset ${isCity ? "Gabby's Money Terminal" : "Gabby's Money Garden"} and clear saved browser data?`)) {
+    if (window.confirm(`Reset ${possessiveName(data.ownerName)} ${isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"} and clear saved browser data?`)) {
       localStorage.removeItem(STORAGE_KEY);
       setData(normalizeData(defaultData));
       setActivePage("Dashboard");
@@ -796,55 +815,71 @@ function App() {
   return (
     <>
       <style>{styles}</style>
-      <div className={`app ${theme === "dark-city" ? "darkCity" : ""} ${isPlain ? "plainTheme" : ""}`}>
+      <div className={`app ${theme === "dark-city" ? "darkCity" : ""} ${isPlain ? "plainTheme" : ""} ${isMountain ? "moneyMountain" : ""}`}>
         <div className="gardenBg" aria-hidden="true">
-          <span className="sun">{isCity ? "🌙" : "☀️"}</span>
-          <span className="cloud cloudA">{isCity ? "</>" : "☁️"}</span>
-          <span className="cloud cloudB">{isCity ? "{}" : "☁️"}</span>
-          <span className="sparkle sparkleA">{isCity ? "01" : "✨"}</span>
-          <span className="sparkle sparkleB">{isCity ? "$_" : "🌸"}</span>
+          <span className="sun">{isMountain ? "❄️" : isCity ? "🌙" : "☀️"}</span>
+          <span className="cloud cloudA">{isMountain ? "🏔️" : isCity ? "</>" : "☁️"}</span>
+          <span className="cloud cloudB">{isMountain ? "🌲" : isCity ? "{}" : "☁️"}</span>
+          <span className="sparkle sparkleA">{isMountain ? "🏂" : isCity ? "01" : "✨"}</span>
+          <span className="sparkle sparkleB">{isMountain ? "❄️" : isCity ? "$_" : "🌸"}</span>
         </div>
 
         <header className="hero">
+          {isMountain ? (
+            <div className="mountainSnow" aria-hidden="true">
+              {Array.from({ length: 18 }).map((_, index) => (
+                <span
+                  key={`snow-${index}`}
+                  style={{
+                    "--snow-x": `${(index * 37) % 100}%`,
+                    "--snow-delay": `${(index % 6) * -0.7}s`,
+                    "--snow-duration": `${5 + (index % 5) * 0.8}s`,
+                    "--snow-size": `${5 + (index % 4) * 2}px`,
+                    "--snow-drift": `${index % 2 === 0 ? 18 : -18}px`,
+                  }}
+                />
+              ))}
+            </div>
+          ) : null}
           <div className="heroTopline">
-            <div className="kicker">{isCity ? "Bryan's" : "Gabby's"}</div>
+            <div className="kicker">{possessiveName(data.ownerName)}</div>
             <div className="themeButtons">
-              <button
-                className="plainToggle"
-                onClick={() => setTheme((current) => (current === "plain" ? "garden" : "plain"))}
-                aria-label="Toggle plain theme"
-              >
-                {isPlain ? "Styled" : "Plain"}
-              </button>
-              <button
-                className="themeToggle"
-                onClick={() => setTheme((current) => (current === "garden" ? "dark-city" : "garden"))}
-                aria-label="Toggle visual theme"
-              >
-                {isCity ? "☀️ Garden Mode" : "⌘ Terminal"}
-              </button>
+              <label className="themeSelectField">
+                <span>Theme</span>
+                <select className="themeSelect" value={theme} onChange={(event) => setTheme(event.target.value)}>
+                  {themeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
           <div className="heroCopy">
-            <h1>{isCity ? "Money Terminal" : "Money Garden"}</h1>
+            <h1>{isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"}</h1>
             <p className="tagline">
-              {isCity ? "Debug the budget one month at a time." : "Grow the money garden one month at a time."}
+              {isMountain
+                ? "Ride the budget down the mountain one clean line at a time."
+                : isCity
+                  ? "Debug the budget one month at a time."
+                  : "Grow the money garden one month at a time."}
             </p>
             <p>
-              {isCity
+              {isMountain
+                ? "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money in a crisp winter lodge view."
+                : isCity
                 ? "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money in a quiet command-center view."
                 : "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money without turning personal finance into a scary spreadsheet jungle."}
             </p>
             <div className="badges" aria-label="App features">
-              <span>{isPlain ? "Auto-saves" : isCity ? "💾 Auto-saves" : "🌱 Auto-saves"}</span>
-              <span>{isPlain ? "Editable fields" : isCity ? "⌨️ Editable fields" : "🌼 Editable fields"}</span>
-              <span>{isPlain ? "No uploads needed" : isCity ? "🔒 Local only" : "🪴 No uploads needed"}</span>
+              <span>{isPlain ? "Auto-saves" : isMountain ? "❄️ Auto-saves" : isCity ? "💾 Auto-saves" : "🌱 Auto-saves"}</span>
+              <span>{isPlain ? "Editable fields" : isMountain ? "🏂 Editable fields" : isCity ? "⌨️ Editable fields" : "🌼 Editable fields"}</span>
+              <span>{isPlain ? "No uploads needed" : isMountain ? "🌲 Local only" : isCity ? "🔒 Local only" : "🪴 No uploads needed"}</span>
             </div>
           </div>
 
           <div className="gameCard">
             <div className="gameTop">
-              <span>{isPlain ? "Saved month" : isCity ? "$_ Console Save" : "🪴 Garden Save"}</span>
+              <span>{isPlain ? "Saved month" : isMountain ? "🏔️ Lodge Save" : isCity ? "$_ Console Save" : "🪴 Garden Save"}</span>
               <select value={selectedMonth} onChange={(event) => updateMonth(event.target.value)}>
                 {months.map((month) => (
                   <option key={month}>{month}</option>
@@ -852,7 +887,7 @@ function App() {
               </select>
             </div>
             <div className="pixelGarden" aria-hidden="true">
-              {(isCity ? ["$_", "{}", "01", "<>", "//"] : ["🌷", "🌱", "🌼", "🍄", "🌿"]).map((icon) => (
+              {(isMountain ? ["🏔️", "🌲", "🏂", "❄️", "🪵"] : isCity ? ["$_", "{}", "01", "<>", "//"] : ["🌷", "🌱", "🌼", "🍄", "🌿"]).map((icon) => (
                 <span key={icon}>{icon}</span>
               ))}
             </div>
@@ -899,6 +934,7 @@ function App() {
               selectedMonth={selectedMonth}
               updateMonth={updateMonth}
               isCity={isCity}
+              isMountain={isMountain}
             />
           )}
           {activePage === "Targets" && (
@@ -935,7 +971,16 @@ function App() {
             <Investing data={data} effectiveActuals={effectiveActuals} totals={totals} isCity={isCity} />
           )}
           {activePage === "Notes" && (
-            <Notes resetData={resetData} exportJson={exportJson} importRef={importRef} importJson={importJson} isCity={isCity} />
+            <Notes
+              data={data}
+              updateOwnerName={updateOwnerName}
+              resetData={resetData}
+              exportJson={exportJson}
+              importRef={importRef}
+              importJson={importJson}
+              isCity={isCity}
+              isMountain={isMountain}
+            />
           )}
         </main>
       </div>
@@ -943,13 +988,13 @@ function App() {
   );
 }
 
-function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, updateMonth, isCity }) {
+function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, updateMonth, isCity, isMountain }) {
   return (
     <section className="pageStack">
       <div className="sectionHeader">
         <div>
           <span className="eyebrow">Dashboard</span>
-          <h2>{selectedMonth}'s {isCity ? "terminal snapshot" : "garden snapshot"}</h2>
+          <h2>{selectedMonth}'s {isMountain ? "mountain snapshot" : isCity ? "terminal snapshot" : "garden snapshot"}</h2>
         </div>
         <select className="monthSelect" value={selectedMonth} onChange={(event) => updateMonth(event.target.value)}>
           {months.map((month) => (
@@ -959,10 +1004,10 @@ function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, u
       </div>
 
       <div className="statGrid">
-        <StatCard icon={isCity ? ">" : "🌼"} label="Monthly income" value={money(data.targets.income)} />
-        <StatCard icon={isCity ? "🧾" : "🌿"} label="Total spending" value={money(totals.totalSpending)} />
-        <StatCard icon="✨" label="Total investing" value={money(totals.totalInvesting)} />
-        <StatCard icon={isCity ? "$_" : "🏡"} label="Leftover / unallocated" value={money(totals.leftover)} tone={totals.leftover < 0 ? "warning" : "good"} />
+        <StatCard icon={isMountain ? "🏔️" : isCity ? ">" : "🌼"} label="Monthly income" value={money(data.targets.income)} />
+        <StatCard icon={isMountain ? "🪵" : isCity ? "🧾" : "🌿"} label="Total spending" value={money(totals.totalSpending)} />
+        <StatCard icon={isMountain ? "🌲" : "✨"} label="Total investing" value={money(totals.totalInvesting)} />
+        <StatCard icon={isMountain ? "🏂" : isCity ? "$_" : "🏡"} label="Leftover / unallocated" value={money(totals.leftover)} tone={totals.leftover < 0 ? "warning" : "good"} />
       </div>
 
       <div className="grid two">
@@ -1414,7 +1459,7 @@ function Investing({ data, effectiveActuals, totals, isCity }) {
   );
 }
 
-function Notes({ resetData, exportJson, importRef, importJson, isCity }) {
+function Notes({ data, updateOwnerName, resetData, exportJson, importRef, importJson, isCity, isMountain }) {
   return (
     <section className="pageStack">
       <div className="sectionHeader">
@@ -1423,6 +1468,22 @@ function Notes({ resetData, exportJson, importRef, importJson, isCity }) {
           <h2>Assumptions, backups, and gentle reality checks</h2>
         </div>
       </div>
+
+      <Card title="Personalization" icon={isMountain ? "🏔️" : isCity ? ">" : "🌼"}>
+        <div className="formGrid">
+          <label className="field">
+            <span>Name on the app</span>
+            <input
+              className="textInput"
+              value={data.ownerName}
+              placeholder="Gabby"
+              onChange={(event) => updateOwnerName(event.target.value)}
+              aria-label="Name shown in the app header"
+            />
+            <small>Updates the name chip across every theme.</small>
+          </label>
+        </div>
+      </Card>
 
       <Card title={isCity ? "Terminal Notes" : "Garden Notes"} icon={isCity ? "$_" : "🌿"}>
         <ul className="noteList">
@@ -1445,7 +1506,7 @@ function Notes({ resetData, exportJson, importRef, importJson, isCity }) {
         <div className="backupActions">
           <button className="softButton" onClick={exportJson}>Export JSON backup</button>
           <button className="softButton" onClick={() => importRef.current?.click()}>Import JSON backup</button>
-          <button className="dangerButton" onClick={resetData}>Reset {isCity ? "terminal" : "garden"}</button>
+          <button className="dangerButton" onClick={resetData}>Reset {isMountain ? "mountain" : isCity ? "terminal" : "garden"}</button>
           <input ref={importRef} className="hiddenFile" type="file" accept="application/json,.json" onChange={importJson} />
         </div>
       </Card>
@@ -1692,6 +1753,20 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+.themeSelectField {
+  display: grid;
+  gap: 5px;
+  min-width: 190px;
+}
+.themeSelectField span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.themeSelect {
+  min-width: 190px;
 }
 .kicker, .eyebrow {
   display: inline-flex;
@@ -2006,7 +2081,7 @@ h2 {
   align-content: start;
   gap: 12px;
   min-width: 0;
-  padding: 12px;
+  padding: 12px 16px 16px 12px;
   border: 2px dashed rgba(77, 56, 93, 0.2);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.34);
@@ -2040,7 +2115,7 @@ h2 {
   gap: 9px;
   min-height: 0;
   overflow: hidden;
-  padding-top: 10px;
+  padding: 10px 8px 9px 0;
 }
 .transactionListWrap {
   display: grid;
@@ -2125,19 +2200,25 @@ h2 {
 }
 .confirmRemoveButton,
 .cancelRemoveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   padding-left: 8px;
   padding-right: 8px;
+  line-height: 1;
 }
 .confirmRemoveButton {
   color: #153b24;
   background: linear-gradient(180deg, #fff9df 0 52%, #8ee0a5 52% 100%);
   box-shadow: 0 5px 0 #4f9f65, 4px 4px 0 rgba(77, 56, 93, 0.13);
+  font-size: 1.08rem;
 }
 .cancelRemoveButton {
   color: #5f1f27;
   background: linear-gradient(180deg, #fff9df 0 52%, #ff9aa4 52% 100%);
   box-shadow: 0 5px 0 #d56b72, 4px 4px 0 rgba(77, 56, 93, 0.13);
+  font-size: 1.34rem;
 }
 .addItemButton {
   min-width: 0;
@@ -2438,6 +2519,276 @@ tfoot td { font-weight: 900; background: #c9f2c4; }
   gap: 12px;
 }
 .hiddenFile { display: none; }
+
+body[data-theme="money-mountain"] {
+  color: #12314f;
+  background-color: #45bfff;
+  background-image:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.78) 0 70px, transparent 72px),
+    radial-gradient(circle at 76% 12%, rgba(255, 255, 255, 0.56) 0 54px, transparent 56px),
+    radial-gradient(circle at 84% 58%, rgba(255, 255, 255, 0.42) 0 86px, transparent 88px),
+    linear-gradient(180deg, #20aefe 0%, #55c7ff 36%, #91ddff 68%, #e8f8ff 100%);
+  background-size: auto, auto, auto, auto;
+}
+
+body[data-theme="money-mountain"]::before {
+  background:
+    linear-gradient(120deg, transparent 0 58%, rgba(255, 255, 255, 0.22) 58% 60%, transparent 60% 100%),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0.2) 1px,
+      transparent 1px,
+      transparent 10px
+    );
+  mix-blend-mode: soft-light;
+  opacity: 0.86;
+}
+
+.app.moneyMountain {
+  --ink: #12314f;
+  --muted: #315f83;
+  --outline: #16476b;
+  --deep: #086ca8;
+  --cream: #ffffff;
+  --paper: rgba(255, 255, 255, 0.88);
+  --panel: rgba(215, 242, 255, 0.84);
+  --blush: #8bddff;
+  --blush-strong: #0ea5e9;
+  --lavender: #c5edff;
+  --lavender-strong: #007cc2;
+  --mint: #dff4e9;
+  --mint-strong: #2f7d55;
+  --peach: #c58b57;
+  --blue: #38bdf8;
+  --gold: #d39a5a;
+  --orange: #a66a3d;
+  --yellow-input: #ffffff;
+  --danger: #d35d68;
+  --shadow: 0 16px 0 rgba(17, 98, 148, 0.16), 0 28px 34px rgba(15, 84, 132, 0.24);
+  --small-shadow: 0 8px 0 rgba(17, 98, 148, 0.14), 0 16px 20px rgba(15, 84, 132, 0.18);
+}
+
+.moneyMountain .sun,
+.moneyMountain .cloud,
+.moneyMountain .sparkle {
+  opacity: 0.86;
+  filter: drop-shadow(4px 4px 0 rgba(41, 68, 90, 0.12));
+}
+
+.moneyMountain .hero {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.82) 0 58px, transparent 60px),
+    radial-gradient(circle at 78% 24%, rgba(255, 255, 255, 0.54) 0 76px, transparent 78px),
+    linear-gradient(180deg, #22b8ff 0 34%, #75d6ff 34% 66%, #f7fcff 66% 100%);
+  box-shadow: var(--shadow);
+}
+.moneyMountain .hero > :not(.mountainSnow) {
+  position: relative;
+  z-index: 2;
+}
+.mountainSnow {
+  display: none;
+}
+.moneyMountain .mountainSnow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+}
+.mountainSnow span {
+  position: absolute;
+  top: -18px;
+  left: var(--snow-x);
+  width: var(--snow-size);
+  height: var(--snow-size);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.58);
+  animation: mountainSnowFall var(--snow-duration) linear infinite;
+  animation-delay: var(--snow-delay);
+}
+@keyframes mountainSnowFall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -20px, 0) scale(0.72);
+  }
+  16% {
+    opacity: 0.88;
+  }
+  82% {
+    opacity: 0.58;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--snow-drift), 470px, 0) scale(1);
+  }
+}
+.moneyMountain .hero::before {
+  border-color: rgba(41, 68, 90, 0.24);
+}
+.moneyMountain .kicker,
+.moneyMountain .eyebrow,
+.moneyMountain .card h3 {
+  color: #ffffff;
+  background: linear-gradient(180deg, #3b85a8, #27516c);
+  box-shadow: 0 8px 0 rgba(14, 92, 143, 0.2), 0 14px 20px rgba(15, 84, 132, 0.18);
+}
+.moneyMountain h1,
+.moneyMountain h2 {
+  color: #ffffff;
+  text-shadow:
+    2px 0 #29445a,
+    -2px 0 #29445a,
+    0 2px #29445a,
+    0 -2px #29445a,
+    5px 5px 0 rgba(89, 114, 135, 0.22);
+}
+.moneyMountain .tagline,
+.moneyMountain .heroCopy p:not(.tagline),
+.moneyMountain .badges span,
+.moneyMountain .progressSummary,
+.moneyMountain .row.strong,
+.moneyMountain .cashGrid div {
+  color: #18324a;
+  background: rgba(255, 255, 255, 0.86);
+  border-color: #29445a;
+  box-shadow: var(--small-shadow);
+}
+.moneyMountain .badges span:nth-child(2) {
+  background: #dff4e9;
+}
+.moneyMountain .badges span:nth-child(3) {
+  background: #f4dfc8;
+}
+.moneyMountain .gameCard,
+.moneyMountain .card,
+.moneyMountain .statCard,
+.moneyMountain .miniStats div {
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(14, 165, 233, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(205, 239, 255, 0.86));
+  background-size: 14px 14px, 14px 14px, auto;
+  border-color: #16476b;
+  box-shadow: var(--shadow);
+}
+.moneyMountain .card {
+  background: transparent;
+  box-shadow: none;
+}
+.moneyMountain .statCard:nth-child(2) { background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(173, 232, 255, 0.9)); }
+.moneyMountain .statCard:nth-child(3) { background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(221, 245, 255, 0.92)); }
+.moneyMountain .statCard:nth-child(4) { background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(244, 223, 200, 0.9)); }
+.moneyMountain .pixelGarden {
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255,255,255,0.85) 0 34px, transparent 36px),
+    linear-gradient(to top, #f8fcff 0 22%, transparent 22%),
+    linear-gradient(180deg, #4fc6ff, #f9fdff);
+}
+.moneyMountain .pixelGarden span {
+  filter: drop-shadow(3px 3px 0 rgba(41, 68, 90, 0.16));
+}
+.moneyMountain .nav,
+.moneyMountain .monthlyCategoryCard,
+.moneyMountain .categoryEditorRow,
+.moneyMountain .progressItem {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(22, 71, 107, 0.28);
+  box-shadow: var(--small-shadow);
+}
+.moneyMountain .nav {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+}
+.moneyMountain .card {
+  transform: translateY(-2px);
+}
+.moneyMountain .card:nth-child(2n),
+.moneyMountain .statCard:nth-child(2n) {
+  transform: translateY(2px);
+}
+.moneyMountain .nav button,
+.moneyMountain .softButton,
+.moneyMountain .dangerButton,
+.moneyMountain .themeToggle,
+.moneyMountain .plainToggle {
+  color: #18324a;
+  background: linear-gradient(180deg, #ffffff 0 52%, #38bdf8 52% 100%);
+  box-shadow: 0 5px 0 #0284c7, 4px 4px 0 rgba(22, 71, 107, 0.14);
+}
+.moneyMountain .nav button.active,
+.moneyMountain .itemToggleButton {
+  color: #ffffff;
+  background: linear-gradient(180deg, #0284c7 0 52%, #2f7d55 52% 100%);
+  box-shadow: 0 5px 0 #245f43, 4px 4px 0 rgba(41, 68, 90, 0.14);
+}
+.moneyMountain .dangerButton,
+.moneyMountain .cancelRemoveButton {
+  color: #ffffff;
+  background: linear-gradient(180deg, #c58b57 0 52%, #d35d68 52% 100%);
+  box-shadow: 0 5px 0 #a64750, 4px 4px 0 rgba(41, 68, 90, 0.14);
+}
+.moneyMountain .confirmRemoveButton {
+  color: #ffffff;
+  background: linear-gradient(180deg, #64bde6 0 52%, #2f7d55 52% 100%);
+  box-shadow: 0 5px 0 #245f43, 4px 4px 0 rgba(41, 68, 90, 0.14);
+}
+.moneyMountain select,
+.moneyMountain .inputShell,
+.moneyMountain .textInput,
+.moneyMountain .selectInput,
+.moneyMountain .readonlyCategoryTotal strong {
+  color: #18324a;
+  background: #ffffff;
+  border-color: #29445a;
+  box-shadow: inset 0 -4px 0 #b7e9ff, 4px 4px 0 rgba(22, 71, 107, 0.12);
+}
+.moneyMountain .inputShell:focus-within,
+.moneyMountain .textInput:focus,
+.moneyMountain .selectInput:focus,
+.moneyMountain select:focus {
+  background: #f8fcff;
+  outline: 3px solid rgba(47, 125, 85, 0.28);
+}
+.moneyMountain .field span,
+.moneyMountain .readonlyCategoryTotal span,
+.moneyMountain .pieLegendRow span,
+.moneyMountain .progressItem span,
+.moneyMountain .checkField,
+.moneyMountain .noteList {
+  color: #18324a;
+}
+.moneyMountain small,
+.moneyMountain .miniStats small,
+.moneyMountain .cashGrid span,
+.moneyMountain .row span,
+.moneyMountain .investColumn,
+.moneyMountain .navMonth span,
+.moneyMountain .themeSelectField span {
+  color: #587287;
+}
+.moneyMountain .progressFill,
+.moneyMountain .columnTrack span {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 7px, transparent 7px 14px),
+    linear-gradient(90deg, #0284c7, #38bdf8, #ffffff, #2f7d55);
+}
+.moneyMountain table {
+  background: #ffffff;
+}
+.moneyMountain th {
+  background: #27516c;
+}
+.moneyMountain tbody tr:nth-child(even) td {
+  background: #edf8ff;
+}
+.moneyMountain tfoot td {
+  color: #18324a;
+  background: #dff4e9;
+}
 
 body[data-theme="dark-city"] {
   color: #f7edff;
@@ -3520,6 +3871,8 @@ body[data-theme="plain"]::before {
   .navMonth select { flex: 1; min-width: 0; }
   .heroTopline { align-items: stretch; flex-direction: column; }
   .themeButtons { flex-direction: column; align-items: stretch; }
+  .themeSelectField,
+  .themeSelect { width: 100%; min-width: 0; }
   .gameTop, .sectionHeader, .actions, .progressSummary { align-items: stretch; flex-direction: column; }
   .miniStats, .statGrid, .formGrid, .categoryTargetGrid, .cashGrid { grid-template-columns: 1fr; }
   .transactionRow { grid-template-columns: 1fr; }
