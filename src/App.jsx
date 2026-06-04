@@ -6,6 +6,7 @@ const THEME_KEY = "gabbys-money-garden-theme";
 const themeOptions = [
   { value: "garden", label: "Money Garden" },
   { value: "money-mountain", label: "Money Mountain" },
+  { value: "coffee", label: "Money Cafe" },
   { value: "dark-city", label: "Money Terminal" },
   { value: "plain", label: "Plain" },
 ];
@@ -450,6 +451,7 @@ function App() {
   const isCity = theme === "dark-city";
   const isPlain = theme === "plain";
   const isMountain = theme === "money-mountain";
+  const isCoffee = theme === "coffee";
 
   const totals = useMemo(() => {
     const totalSpending = Object.values(selectedActuals.categories).reduce((sum, item) => sum + toNumber(item), 0);
@@ -777,7 +779,7 @@ function App() {
   }
 
   function resetData() {
-    if (window.confirm(`Reset ${possessiveName(data.ownerName)} ${isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"} and clear saved browser data?`)) {
+    if (window.confirm(`Reset ${possessiveName(data.ownerName)} ${isCoffee ? "Money Cafe" : isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"} and clear saved browser data?`)) {
       localStorage.removeItem(STORAGE_KEY);
       setData(normalizeData(defaultData));
       setActivePage("Dashboard");
@@ -815,13 +817,13 @@ function App() {
   return (
     <>
       <style>{styles}</style>
-      <div className={`app ${theme === "dark-city" ? "darkCity" : ""} ${isPlain ? "plainTheme" : ""} ${isMountain ? "moneyMountain" : ""}`}>
+      <div className={`app ${theme === "dark-city" ? "darkCity" : ""} ${isPlain ? "plainTheme" : ""} ${isMountain ? "moneyMountain" : ""} ${isCoffee ? "coffeeTheme" : ""}`}>
         <div className="gardenBg" aria-hidden="true">
-          <span className="sun">{isMountain ? "❄️" : isCity ? "🌙" : "☀️"}</span>
-          <span className="cloud cloudA">{isMountain ? "🏔️" : isCity ? "</>" : "☁️"}</span>
-          <span className="cloud cloudB">{isMountain ? "🌲" : isCity ? "{}" : "☁️"}</span>
-          <span className="sparkle sparkleA">{isMountain ? "🏂" : isCity ? "01" : "✨"}</span>
-          <span className="sparkle sparkleB">{isMountain ? "❄️" : isCity ? "$_" : "🌸"}</span>
+          <span className="sun">{isCoffee ? "☕" : isMountain ? "❄️" : isCity ? "🌙" : "☀️"}</span>
+          <span className="cloud cloudA">{isCoffee ? "🥐" : isMountain ? "🏔️" : isCity ? "</>" : "☁️"}</span>
+          <span className="cloud cloudB">{isCoffee ? "🫘" : isMountain ? "🌲" : isCity ? "{}" : "☁️"}</span>
+          <span className="sparkle sparkleA">{isCoffee ? "✦" : isMountain ? "🏂" : isCity ? "01" : "✨"}</span>
+          <span className="sparkle sparkleB">{isCoffee ? "☕" : isMountain ? "❄️" : isCity ? "$_" : "🌸"}</span>
         </div>
 
         <header className="hero">
@@ -855,31 +857,35 @@ function App() {
             </div>
           </div>
           <div className="heroCopy">
-            <h1>{isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"}</h1>
+            <h1>{isCoffee ? "Money Cafe" : isMountain ? "Money Mountain" : isCity ? "Money Terminal" : "Money Garden"}</h1>
             <p className="tagline">
-              {isMountain
+              {isCoffee
+                ? "Brew the budget one cozy month at a time."
+                : isMountain
                 ? "Ride the budget down the mountain one clean line at a time."
                 : isCity
                   ? "Debug the budget one month at a time."
                   : "Grow the money garden one month at a time."}
             </p>
             <p>
-              {isMountain
+              {isCoffee
+                ? "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money in a warm little cafe booth."
+                : isMountain
                 ? "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money in a crisp winter lodge view."
                 : isCity
                 ? "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money in a quiet command-center view."
                 : "Track spending, savings, Roth IRA progress, brokerage contributions, and future move-out money without turning personal finance into a scary spreadsheet jungle."}
             </p>
             <div className="badges" aria-label="App features">
-              <span>{isPlain ? "Auto-saves" : isMountain ? "❄️ Auto-saves" : isCity ? "💾 Auto-saves" : "🌱 Auto-saves"}</span>
-              <span>{isPlain ? "Editable fields" : isMountain ? "🏂 Editable fields" : isCity ? "⌨️ Editable fields" : "🌼 Editable fields"}</span>
-              <span>{isPlain ? "No uploads needed" : isMountain ? "🌲 Local only" : isCity ? "🔒 Local only" : "🪴 No uploads needed"}</span>
+              <span>{isPlain ? "Auto-saves" : isCoffee ? "☕ Auto-saves" : isMountain ? "❄️ Auto-saves" : isCity ? "💾 Auto-saves" : "🌱 Auto-saves"}</span>
+              <span>{isPlain ? "Editable fields" : isCoffee ? "🥐 Editable fields" : isMountain ? "🏂 Editable fields" : isCity ? "⌨️ Editable fields" : "🌼 Editable fields"}</span>
+              <span>{isPlain ? "No uploads needed" : isCoffee ? "🫘 Local only" : isMountain ? "🌲 Local only" : isCity ? "🔒 Local only" : "🪴 No uploads needed"}</span>
             </div>
           </div>
 
           <div className="gameCard">
             <div className="gameTop">
-              <span>{isPlain ? "Saved month" : isMountain ? "🏔️ Lodge Save" : isCity ? "$_ Console Save" : "🪴 Garden Save"}</span>
+              <span>{isPlain ? "Saved month" : isCoffee ? "☕ Cafe Save" : isMountain ? "🏔️ Lodge Save" : isCity ? "$_ Console Save" : "🪴 Garden Save"}</span>
               <select value={selectedMonth} onChange={(event) => updateMonth(event.target.value)}>
                 {months.map((month) => (
                   <option key={month}>{month}</option>
@@ -887,7 +893,7 @@ function App() {
               </select>
             </div>
             <div className="pixelGarden" aria-hidden="true">
-              {(isMountain ? ["🏔️", "🌲", "🏂", "❄️", "🪵"] : isCity ? ["$_", "{}", "01", "<>", "//"] : ["🌷", "🌱", "🌼", "🍄", "🌿"]).map((icon) => (
+              {(isCoffee ? ["☕", "🫘", "🥐", "✦", "$"] : isMountain ? ["🏔️", "🌲", "🏂", "❄️", "🪵"] : isCity ? ["$_", "{}", "01", "<>", "//"] : ["🌷", "🌱", "🌼", "🍄", "🌿"]).map((icon) => (
                 <span key={icon}>{icon}</span>
               ))}
             </div>
@@ -935,6 +941,7 @@ function App() {
               updateMonth={updateMonth}
               isCity={isCity}
               isMountain={isMountain}
+              isCoffee={isCoffee}
             />
           )}
           {activePage === "Targets" && (
@@ -980,6 +987,7 @@ function App() {
               importJson={importJson}
               isCity={isCity}
               isMountain={isMountain}
+              isCoffee={isCoffee}
             />
           )}
         </main>
@@ -988,13 +996,13 @@ function App() {
   );
 }
 
-function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, updateMonth, isCity, isMountain }) {
+function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, updateMonth, isCity, isMountain, isCoffee }) {
   return (
     <section className="pageStack">
       <div className="sectionHeader">
         <div>
           <span className="eyebrow">Dashboard</span>
-          <h2>{selectedMonth}'s {isMountain ? "mountain snapshot" : isCity ? "terminal snapshot" : "garden snapshot"}</h2>
+          <h2>{selectedMonth}'s {isCoffee ? "cafe snapshot" : isMountain ? "mountain snapshot" : isCity ? "terminal snapshot" : "garden snapshot"}</h2>
         </div>
         <select className="monthSelect" value={selectedMonth} onChange={(event) => updateMonth(event.target.value)}>
           {months.map((month) => (
@@ -1004,10 +1012,10 @@ function Dashboard({ data, categories, totals, selectedActuals, selectedMonth, u
       </div>
 
       <div className="statGrid">
-        <StatCard icon={isMountain ? "🏔️" : isCity ? ">" : "🌼"} label="Monthly income" value={money(data.targets.income)} />
-        <StatCard icon={isMountain ? "🪵" : isCity ? "🧾" : "🌿"} label="Total spending" value={money(totals.totalSpending)} />
-        <StatCard icon={isMountain ? "🌲" : "✨"} label="Total investing" value={money(totals.totalInvesting)} />
-        <StatCard icon={isMountain ? "🏂" : isCity ? "$_" : "🏡"} label="Leftover / unallocated" value={money(totals.leftover)} tone={totals.leftover < 0 ? "warning" : "good"} />
+        <StatCard icon={isCoffee ? "☕" : isMountain ? "🏔️" : isCity ? ">" : "🌼"} label="Monthly income" value={money(data.targets.income)} />
+        <StatCard icon={isCoffee ? "🫘" : isMountain ? "🪵" : isCity ? "🧾" : "🌿"} label="Total spending" value={money(totals.totalSpending)} />
+        <StatCard icon={isCoffee ? "🥐" : isMountain ? "🌲" : "✨"} label="Total investing" value={money(totals.totalInvesting)} />
+        <StatCard icon={isCoffee ? "$" : isMountain ? "🏂" : isCity ? "$_" : "🏡"} label="Leftover / unallocated" value={money(totals.leftover)} tone={totals.leftover < 0 ? "warning" : "good"} />
       </div>
 
       <div className="grid two">
@@ -1459,7 +1467,7 @@ function Investing({ data, effectiveActuals, totals, isCity }) {
   );
 }
 
-function Notes({ data, updateOwnerName, resetData, exportJson, importRef, importJson, isCity, isMountain }) {
+function Notes({ data, updateOwnerName, resetData, exportJson, importRef, importJson, isCity, isMountain, isCoffee }) {
   return (
     <section className="pageStack">
       <div className="sectionHeader">
@@ -1469,7 +1477,7 @@ function Notes({ data, updateOwnerName, resetData, exportJson, importRef, import
         </div>
       </div>
 
-      <Card title="Personalization" icon={isMountain ? "🏔️" : isCity ? ">" : "🌼"}>
+      <Card title="Personalization" icon={isCoffee ? "☕" : isMountain ? "🏔️" : isCity ? ">" : "🌼"}>
         <div className="formGrid">
           <label className="field">
             <span>Name on the app</span>
@@ -1506,7 +1514,7 @@ function Notes({ data, updateOwnerName, resetData, exportJson, importRef, import
         <div className="backupActions">
           <button className="softButton" onClick={exportJson}>Export JSON backup</button>
           <button className="softButton" onClick={() => importRef.current?.click()}>Import JSON backup</button>
-          <button className="dangerButton" onClick={resetData}>Reset {isMountain ? "mountain" : isCity ? "terminal" : "garden"}</button>
+          <button className="dangerButton" onClick={resetData}>Reset {isCoffee ? "coffee house" : isMountain ? "mountain" : isCity ? "terminal" : "garden"}</button>
           <input ref={importRef} className="hiddenFile" type="file" accept="application/json,.json" onChange={importJson} />
         </div>
       </Card>
@@ -2519,6 +2527,235 @@ tfoot td { font-weight: 900; background: #c9f2c4; }
   gap: 12px;
 }
 .hiddenFile { display: none; }
+
+body[data-theme="coffee"] {
+  color: #f7e5cf;
+  background-color: #24150f;
+  background-image: none;
+}
+
+body[data-theme="coffee"]::before {
+  display: none;
+}
+
+.app.coffeeTheme {
+  --ink: #3b2418;
+  --muted: #725039;
+  --outline: #2a1710;
+  --deep: #4a2617;
+  --cream: #fff6e8;
+  --paper: #fffaf0;
+  --panel: #f7e1c8;
+  --blush: #f2c48d;
+  --blush-strong: #bf7b3b;
+  --lavender: #ead0b4;
+  --lavender-strong: #9b5f33;
+  --mint: #e8c39a;
+  --mint-strong: #8a5638;
+  --peach: #d79a5f;
+  --blue: #9ed8d2;
+  --gold: #d99a3d;
+  --orange: #b96e32;
+  --yellow-input: #fff8e8;
+  --danger: #c65d56;
+  --shadow: 8px 8px 0 rgba(20, 10, 6, 0.4), 0 18px 30px rgba(20, 10, 6, 0.34);
+  --small-shadow: 4px 4px 0 rgba(20, 10, 6, 0.3), 0 10px 18px rgba(20, 10, 6, 0.24);
+}
+
+.coffeeTheme .sun,
+.coffeeTheme .cloud,
+.coffeeTheme .sparkle {
+  opacity: 0.76;
+  filter: drop-shadow(4px 4px 0 rgba(75, 44, 29, 0.14));
+}
+
+.coffeeTheme .hero {
+  background: transparent;
+  box-shadow: none;
+}
+.coffeeTheme .hero::before {
+  border-color: rgba(255, 246, 232, 0.22);
+}
+.coffeeTheme .kicker,
+.coffeeTheme .eyebrow,
+.coffeeTheme .card h3 {
+  color: #fff6e8;
+  background: #4b2c1d;
+  box-shadow: 4px 4px 0 rgba(75, 44, 29, 0.18);
+}
+.coffeeTheme h1,
+.coffeeTheme h2 {
+  color: #fff6e8;
+  text-shadow:
+    2px 0 #4b2c1d,
+    -2px 0 #4b2c1d,
+    0 2px #4b2c1d,
+    0 -2px #4b2c1d,
+    5px 5px 0 rgba(75, 44, 29, 0.28);
+}
+.coffeeTheme .tagline,
+.coffeeTheme .heroCopy p:not(.tagline),
+.coffeeTheme .badges span {
+  color: #fff6e8;
+  background: #2a1710;
+  border-color: #8a5638;
+}
+.coffeeTheme .progressSummary,
+.coffeeTheme .row.strong,
+.coffeeTheme .cashGrid div {
+  color: #342015;
+  background: rgba(255, 250, 240, 0.92);
+  border-color: #4b2c1d;
+}
+.coffeeTheme .badges span:nth-child(2) {
+  background: #3a2016;
+}
+.coffeeTheme .badges span:nth-child(3) {
+  background: #4b2c1d;
+}
+.coffeeTheme .gameCard,
+.coffeeTheme .card,
+.coffeeTheme .statCard,
+.coffeeTheme .miniStats div {
+  color: #3b2418;
+  background: #f4d2a7;
+  border-color: #4b2c1d;
+  box-shadow: var(--shadow);
+}
+.coffeeTheme .gameCard {
+  color: #fff6e8;
+  background: #2a1710;
+  border-color: #8a5638;
+}
+.coffeeTheme .gameCard .gameTop span,
+.coffeeTheme .gameCard .miniStats small,
+.coffeeTheme .gameCard .miniStats strong {
+  color: #fff6e8;
+}
+.coffeeTheme .gameCard .miniStats div {
+  color: #fff6e8;
+  background: #4b2c1d;
+  border-color: #8a5638;
+}
+.coffeeTheme .hero .themeSelectField span {
+  color: #fff6e8;
+}
+.coffeeTheme .hero select {
+  color: #fff6e8;
+  background: #2a1710;
+  border-color: #8a5638;
+  box-shadow: inset 0 -4px 0 #1a0f0b, 4px 4px 0 rgba(20, 10, 6, 0.24);
+}
+.coffeeTheme .statCard:nth-child(2) { background: #ead0b4; }
+.coffeeTheme .statCard:nth-child(3) { background: #f1c28f; }
+.coffeeTheme .statCard:nth-child(4) { background: #c9854e; }
+.coffeeTheme .pixelGarden {
+  background: #f2bf83;
+}
+.coffeeTheme .nav,
+.coffeeTheme .monthlyCategoryCard,
+.coffeeTheme .categoryEditorRow,
+.coffeeTheme .progressItem {
+  background: rgba(255, 242, 223, 0.88);
+  border-color: rgba(75, 44, 29, 0.24);
+}
+.coffeeTheme .nav button,
+.coffeeTheme .softButton,
+.coffeeTheme .dangerButton,
+.coffeeTheme .themeToggle,
+.coffeeTheme .plainToggle {
+  color: #342015;
+  background: #d99a5f;
+  box-shadow: 0 5px 0 #9b5f33, 4px 4px 0 rgba(75, 44, 29, 0.14);
+}
+.coffeeTheme .nav button.active,
+.coffeeTheme .itemToggleButton {
+  color: #fff6e8;
+  background: #6f3f27;
+  box-shadow: 0 5px 0 #3a2016, 4px 4px 0 rgba(75, 44, 29, 0.14);
+}
+.coffeeTheme .dangerButton,
+.coffeeTheme .cancelRemoveButton {
+  color: #fff6e8;
+  background: #c65d56;
+  box-shadow: 0 5px 0 #8e3d36, 4px 4px 0 rgba(75, 44, 29, 0.14);
+}
+.coffeeTheme .confirmRemoveButton {
+  color: #fff6e8;
+  background: #bf7b3b;
+  box-shadow: 0 5px 0 #8a5638, 4px 4px 0 rgba(75, 44, 29, 0.14);
+}
+.coffeeTheme select,
+.coffeeTheme .inputShell,
+.coffeeTheme .textInput,
+.coffeeTheme .selectInput,
+.coffeeTheme .readonlyCategoryTotal strong {
+  color: #342015;
+  background: #fff8e8;
+  border-color: #4b2c1d;
+  box-shadow: inset 0 -4px 0 #e7c79e, 4px 4px 0 rgba(75, 44, 29, 0.12);
+}
+.coffeeTheme .inputShell:focus-within,
+.coffeeTheme .textInput:focus,
+.coffeeTheme .selectInput:focus,
+.coffeeTheme select:focus {
+  background: #fffdf4;
+  outline: 3px solid rgba(191, 123, 59, 0.36);
+}
+.coffeeTheme .field span,
+.coffeeTheme .readonlyCategoryTotal span,
+.coffeeTheme .pieLegendRow span,
+.coffeeTheme .progressItem span,
+.coffeeTheme .checkField,
+.coffeeTheme .noteList {
+  color: #342015;
+}
+.coffeeTheme small,
+.coffeeTheme .miniStats small,
+.coffeeTheme .cashGrid span,
+.coffeeTheme .row span,
+.coffeeTheme .investColumn,
+.coffeeTheme .navMonth span,
+.coffeeTheme .themeSelectField span {
+  color: #7b5a42;
+}
+.coffeeTheme .gameTop span,
+.coffeeTheme .statCard span,
+.coffeeTheme .statCard strong,
+.coffeeTheme .miniStats strong,
+.coffeeTheme .row strong,
+.coffeeTheme td,
+.coffeeTheme tfoot td {
+  color: #3b2418;
+}
+.coffeeTheme .statCard.good strong {
+  color: #4b2c1d;
+}
+.coffeeTheme .statCard.warning strong {
+  color: #7f2f2b;
+}
+.coffeeTheme .progressTrack,
+.coffeeTheme .columnTrack {
+  background: #ead0b4;
+  box-shadow: inset 0 2px 0 rgba(255, 248, 232, 0.55);
+}
+.coffeeTheme .progressFill,
+.coffeeTheme .columnTrack span {
+  background: #bf7b3b !important;
+}
+.coffeeTheme table {
+  background: #fffaf0;
+}
+.coffeeTheme th {
+  background: #5b321f;
+}
+.coffeeTheme tbody tr:nth-child(even) td {
+  background: #f7e6d1;
+}
+.coffeeTheme tfoot td {
+  color: #342015;
+  background: #ead0b4;
+}
 
 body[data-theme="money-mountain"] {
   color: #12314f;
